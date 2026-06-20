@@ -65,13 +65,13 @@ const scoreEl = document.getElementById("score");
 const restartBtn = document.getElementById("restart-btn");
 
 // ==========================================
-// 🖼️ 【画像URLリスト】
+// 🖼️ 【画像URLリスト】実際のファイル名に修正しました！
 // ==========================================
 const bgImages = [
     "https://liginc.co.jp/wp-content/uploads/1954/12/gorilla-610457.jpg",
     "https://www.aloalo.co.jp/nakazawa/2018/0725c.jpg",
-    "bg1.jpg",
-    "bg2.jpg"
+    "bg1.jpg.JPG",
+    "bg2.jpg.png"
 ];
 
 let currentBgImage = new Image(); // 現在の背景画像を保持するオブジェクト
@@ -204,7 +204,6 @@ function draw() {
         for (let r = 0; r < BRICK_ROWS; r++) {
             let b = bricks[c][r];
             if (b.status === 1) {
-                // ❗ここが超重要変更！
                 // まだ壊されていないブロックの位置だけ、まず「黒い四角」を描いて奥の画像を完全に隠します！
                 ctx.fillStyle = "#000000";
                 ctx.fillRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
@@ -213,7 +212,6 @@ function draw() {
                 ctx.fillStyle = colors[r];
                 ctx.fillRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
             }
-            // ※ status === 0（壊されたブロック）の場所は何も描画されないので、一番奥の画像が露出します！
         }
     }
 
