@@ -88,12 +88,12 @@ const BRICK_HEIGHT = 22;   // 1つあたりの高さ
 const BRICK_PADDING = 0;   // 隙間なし
 const BRICK_OFFSET_TOP = 40;
 
-// 🧱 ブロック全体が画面の真ん中に来るように左の余白を自動計算
-const TOTAL_BRICK_WIDTH = BRICK_WIDTH * BRICK_COLS;
-const BRICK_OFFSET_LEFT = (canvas.width - TOTAL_BRICK_WIDTH) / 2;
+// 🧱 ブロック全体（画像を表示する範囲）の横幅と高さを計算
+const TOTAL_BRICK_WIDTH = BRICK_WIDTH * BRICK_COLS;   // 60 * 6 = 360px
+const BRICK_AREA_HEIGHT = BRICK_HEIGHT * BRICK_ROWS;  // 22 * 5 = 110px
 
-// 🧱 ブロックエリア全体の最下部のY座標を計算
-const BRICK_AREA_BOTTOM = BRICK_OFFSET_TOP + (BRICK_HEIGHT * BRICK_ROWS);
+// 🧱 ブロック全体が画面の真ん中に来るように左の余白を自動計算
+const BRICK_OFFSET_LEFT = (canvas.width - TOTAL_BRICK_WIDTH) / 2;
 
 function initGame() {
     score = 0;
@@ -190,47 +190,53 @@ function update() {
 
 // 描画処理
 function draw() {
-    // 画面全体を黒でクリア
+    // 1️⃣ 【ベース】画面全体を「完全に真っ黒」に塗りつぶす（これでプレイエリアなどは黒確定）
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const isImgReady = currentBgImage && currentBgImage.complete && currentBgImage.naturalWidth !== 0;
 
-    // 1️⃣ 【プレイエリア（下半分）】に画像を描画（ブロックエリアには絶対にはみ出させない）
+    // 2️⃣ 【ブロックエリアのみ】壊されたブロックの隙間から、リサイズされた画像を表示する
     if (isImgReady) {
-        ctx.save();
-        ctx.beginPath();
-        // 切り抜き範囲をブロックエリアより下全体に指定
-        ctx.rect(0, BRICK_AREA_BOTTOM, canvas.width, canvas.height - BRICK_AREA_BOTTOM);
-        ctx.clip();
-        ctx.drawImage(currentBgImage, 0, 0, canvas.width, canvas.height);
-        ctx.restore();
-    }
-
-    // 2️⃣ 【ブロックエリア】の描画処理
-    const colors = ["#ff5e57", "#ffdd59", "#0be881", "#4bcffa", "#ef5777"];
-    for (let c = 0; c < BRICK_COLS; c++) {
-        for (let r = 0; r < BRICK_ROWS; r++) {
-            let b = bricks[c][r];
-            
-            if (b.status === 1) {
-                // まだ残っているブロックは通常通りカラフルに描画（後ろはキャンバスの初期値の黒）
-                ctx.fillStyle = colors[r];
-                ctx.fillRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
-            } else if (b.status === 0 && isImgReady) {
-                // ❗ここが今回の最大の修正ポイント！
-                // ブロックが壊された（status === 0）場所「だけ」にピンポイントで画像を切り抜いて描画します。
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT); // このブロックのサイズだけ切り抜く
-                ctx.clip();
-                ctx.drawImage(currentBgImage, 0, 0, canvas.width, canvas.height); // 画像を重ねる
-                ctx.restore();
+        for (let c = 0; c < BRICK_COLS; c++) {
+            for (let r = 0; r < BRICK_ROWS; r++) {
+                let b = bricks[c][r];
+                
+                if (b.status === 0) {
+                    // ❗ここが今回の核心ロジック！
+                    // ブロックが壊された場所だけ、ピンポイントに切り抜いて「ブロックエリアぴったりに縮小された画像」を描画します。
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
+                    ctx.clip();
+                    
+                    // 画像の描画先を、画面全体ではなく「ブロックの並びのエリア内（360x110）」にぴったり合わせます！
+                    ctx.drawImage(
+                        currentBgImage, 
+                        BRICK_OFFSET_LEFT, 
+                        BRICK_OFFSET_TOP, 
+                        TOTAL_BRICK_WIDTH, 
+                        BRICK_AREA_HEIGHT
+                    );
+                    ctx.restore();
+                }
             }
         }
     }
 
-    // 3️⃣ パドルとボールを描く
+    // 3️⃣ 【手前】まだ残っているブロックを重ねて描く
+    const colors = ["#ff5e57", "#ffdd59", "#0be881", "#4bcffa", "#ef5777"];
+    for (let c = 0; c < BRICK_COLS; c++) {
+        for (let r = 0; r < BRICK_ROWS; r++) {
+            let b = bricks[c][r];
+            if (b.status === 1) {
+                ctx.fillStyle = colors[r];
+                ctx.fillRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
+            }
+        }
+    }
+
+    // 4️⃣ パドルとボールを描く
     ctx.fillStyle = "#ffdd59";
     ctx.fillRect(paddle.x, canvas.height - 25, paddle.width, paddle.height);
 
@@ -239,7 +245,7 @@ function draw() {
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // 4️⃣ 文字の表示
+    // 5️⃣ 文字の表示
     if (gameOver) {
         ctx.fillStyle = "#ff5e57";
         ctx.font = "bold 35px Arial";
