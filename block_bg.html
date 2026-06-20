@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>背景画像が変わる！ブロック崩し</title>
+    <style>
+        body {
+            background-color: #111;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+        }
+        #score {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 15px 0 5px 0;
+        }
+        canvas {
+            background-color: #000;
+            display: block;
+            margin: 0 auto;
+            max-width: 95vw;
+            max-height: 70vh;
+            border: 4px solid #333;
+            border-radius: 10px;
+        }
+        #restart-btn {
+            display: none;
+            position: absolute;
+            top: 40vh;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ffdd59;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 221, 89, 0.4);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+<div id="score">SCORE: 0</div>
+<div style="position: relative;">
+    <canvas id="gameCanvas" width="400" height="500"></canvas>
+    <button id="restart-btn" onclick="initGame()">NEXT STAGE (RESTART)</button>
+</div>
+
+<p style="color: #888; font-size: 14px; margin-top: 10px;">パソコン：マウス移動 / スマホ：画面をスワイプ</p>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const scoreEl = document.getElementById("score");
+const restartBtn = document.getElementById("restart-btn");
+
+// ==========================================
+// 🖼️ 【ここに好きな画像のURLを好きなだけ入れる！】
+// ==========================================
+const bgImages = [
+    "https://liginc.co.jp/wp-content/uploads/1954/12/gorilla-610457.jpg", // ランダムな写真1
+    "https://www.aloalo.co.jp/nakazawa/2018/0725c.jpg", // ランダムな写真2
+    "bg1.jpg", // ランダムな写真3
+    "bg2.jpg"  // ランダムな写真4
+    // 自分で用意したイラストのURL（ネット上のURL）に書き換えてもOKです！
+];
+
+let currentBgImage = new Image(); // 現在の背景画像を保持するオブジェクト
+
+// ゲームの変数
+let score, gameOver, gameClear;
+let ball, paddle, bricks;
+
+const BRICK_ROWS = 5;
+const BRICK_COLS = 6;
+const BRICK_WIDTH = 55;
+const BRICK_HEIGHT = 20;
+const BRICK_PADDING = 7;
+const BRICK_OFFSET_TOP = 40;
+const BRICK_OFFSET_LEFT = 18;
+
+function initGame() {
+    score = 0;
+    gameOver = false;
+    gameClear = false;
+    scoreEl.innerText = "SCORE: " + score;
+    restartBtn.style.display = "none";
+
+    // 🎨 【追加】リスタート時に画像リストからランダムに1枚選ぶ
+    const randomIndex = Math.floor(Math.random() * bgImages.length);
+    currentBgImage.src = bgImages[randomIndex];
+
+    // ボールとパドルの初期化
+    ball = { x: canvas.width / 2, y: canvas.height - 50, dx: 4, dy: -4, radius: 8 };
+    paddle = { width: 90, height: 12, x: (canvas.width - 90) / 2 };
+
+    // ブロックの生成
+    bricks = [];
+    for (let c = 0; c < BRICK_COLS; c++) {
+        bricks[c] = [];
+        for (let r = 0; r < BRICK_ROWS; r++) {
+            bricks[c][r] = { x: 0, y: 0, status: 1 };
+        }
+    }
+    
+    gameLoop();
+}
+
+// 移動処理（マウス・タッチ）
+function movePaddle(clientX) {
+    const rect = canvas.getBoundingClientRect();
+    const rootX = (clientX - rect.left) * (canvas.width / rect.width);
+    paddle.x = rootX - paddle.width / 2;
+    if (paddle.x < 0) paddle.x = 0;
+    if (paddle.x + paddle.width > canvas.width) paddle.x = canvas.width - paddle.width;
+}
+
+window.addEventListener("mousemove", (e) => movePaddle(e.clientX));
+window.addEventListener("touchmove", (e) => {
+    if (e.touches.length > 0) movePaddle(e.touches[0].clientX);
+}, { passive: false });
+
+// 判定処理
+function update() {
+    if (gameOver || gameClear) return;
+
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
+        ball.dx = -ball.dx;
+    }
+    if (ball.y + ball.dy < ball.radius) {
+        ball.dy = -ball.dy;
+    } else if (ball.y + ball.dy > canvas.height - ball.radius) {
+        if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
+            ball.dy = -ball.dy;
+        } else {
+            gameOver = true;
+            restartBtn.style.display = "block";
+        }
+    }
+
+    let countActiveBricks = 0;
+    for (let c = 0; c < BRICK_COLS; c++) {
+        for (let r = 0; r < BRICK_ROWS; r++) {
+            let b = bricks[c][r];
+            if (b.status === 1) {
+                countActiveBricks++;
+                if (ball.x > b.x && ball.x < b.x + BRICK_WIDTH && ball.y > b.y && ball.y < b.y + BRICK_HEIGHT) {
+                    ball.dy = -ball.dy;
+                    b.status = 0;
+                    score += 10;
+                    scoreEl.innerText = "SCORE: " + score;
+                }
+            }
+        }
+    }
+
+    if (countActiveBricks === 0) {
+        gameClear = true;
+        restartBtn.style.display = "block";
+    }
+}
+
+// 描画処理
+function draw() {
+    // 画面全体を消去
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 🖼️ 【追加】背景画像を一番奥に描画する
+    // 画像の読み込みが完了している場合のみ描画
+    if (currentBgImage.complete) {
+        ctx.drawImage(currentBgImage, 0, 0, canvas.width, canvas.height);
+    }
+
+    // ブロックを描く（存在しているブロックだけを描画するので、消えた場所は背景が見える！）
+    const colors = ["#ff5e57", "#ffdd59", "#0be881", "#4bcffa", "#ef5777"];
+    for (let c = 0; c < BRICK_COLS; c++) {
+        for (let r = 0; r < BRICK_ROWS; r++) {
+            if (bricks[c][r].status === 1) {
+                let brickX = (c * (BRICK_WIDTH + BRICK_PADDING)) + BRICK_OFFSET_LEFT;
+                let brickY = (r * (BRICK_HEIGHT + BRICK_PADDING)) + BRICK_OFFSET_TOP;
+                bricks[c][r].x = brickX;
+                bricks[c][r].y = brickY;
+                ctx.fillStyle = colors[r];
+                ctx.fillRect(brickX, brickY, BRICK_WIDTH, BRICK_HEIGHT);
+            }
+        }
+    }
+
+    // パドルを描く
+    ctx.fillStyle = "#ffdd59";
+    ctx.fillRect(paddle.x, canvas.height - 25, paddle.width, paddle.height);
+
+    // ボールを描く
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ゲームオーバー・クリア文字
+    if (gameOver) {
+        ctx.fillStyle = "#ff5e57";
+        ctx.font = "bold 35px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+    } else if (gameClear) {
+        ctx.fillStyle = "#0be881";
+        ctx.font = "bold 35px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("STAGE CLEAR !!", canvas.width / 2, canvas.height / 2);
+    }
+}
+
+function gameLoop() {
+    update();
+    draw();
+    if (!gameOver && !gameClear) {
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+// 初回スタート
+initGame();
+</script>
+</body>
+</html>
