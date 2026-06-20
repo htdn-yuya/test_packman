@@ -32,7 +32,7 @@
         #restart-btn {
             display: none;
             position: absolute;
-            top: 40vh;
+            top: 45vh;
             left: 50%;
             transform: translateX(-50%);
             background-color: #ffdd59;
@@ -52,7 +52,7 @@
 
 <div id="score">SCORE: 0</div>
 <div style="position: relative;">
-    <canvas id="gameCanvas" width="400" height="500"></canvas>
+    <canvas id="gameCanvas" width="400" height="520"></canvas>
     <button id="restart-btn" onclick="initGame()">NEXT STAGE (RESTART)</button>
 </div>
 
@@ -81,16 +81,17 @@ let gameIntervalId = null;        // 二重起動防止用のループ管理ID
 let score, gameOver, gameClear;
 let ball, paddle, bricks;
 
-const BRICK_ROWS = 5;
+// 📊 スマホの横写真（16:9）にぴったり合わせるためのブロック設定
 const BRICK_COLS = 6;
-const BRICK_WIDTH = 60;    // 1つあたりの幅
-const BRICK_HEIGHT = 22;   // 1つあたりの高さ
+const BRICK_ROWS = 9;      // 行数を5から9に増やしてエリアを縦に拡大！
+const BRICK_WIDTH = 60;    // 1つあたりの幅（60 * 6 = 360px）
+const BRICK_HEIGHT = 22.5; // 高さを微調整（22.5 * 9 = 202.5px）
 const BRICK_PADDING = 0;   // 隙間なし
-const BRICK_OFFSET_TOP = 40;
+const BRICK_OFFSET_TOP = 30;
 
 // 🧱 ブロック全体（画像を表示する範囲）の横幅と高さを計算
-const TOTAL_BRICK_WIDTH = BRICK_WIDTH * BRICK_COLS;   // 60 * 6 = 360px
-const BRICK_AREA_HEIGHT = BRICK_HEIGHT * BRICK_ROWS;  // 22 * 5 = 110px
+const TOTAL_BRICK_WIDTH = BRICK_WIDTH * BRICK_COLS;   // 360px
+const BRICK_AREA_HEIGHT = BRICK_HEIGHT * BRICK_ROWS;  // 202.5px（360:202.5 ＝ 16:9の黄金比！）
 
 // 🧱 ブロック全体が画面の真ん中に来るように左の余白を自動計算
 const BRICK_OFFSET_LEFT = (canvas.width - TOTAL_BRICK_WIDTH) / 2;
@@ -112,8 +113,8 @@ function initGame() {
     currentBgImage = new Image();
     currentBgImage.src = bgImages[randomIndex];
 
-    // ボールとパドルの初期化
-    ball = { x: canvas.width / 2, y: canvas.height - 50, dx: 4, dy: -4, radius: 8 };
+    // ボールとパドルの初期化（ブロックが増えたので速度を 4 → 5 に少しアップ！）
+    ball = { x: canvas.width / 2, y: canvas.height - 60, dx: 5, dy: -5, radius: 8 };
     paddle = { width: 90, height: 12, x: (canvas.width - 90) / 2 };
 
     // ブロックの初期位置と存在フラグを設定
@@ -190,27 +191,25 @@ function update() {
 
 // 描画処理
 function draw() {
-    // 1️⃣ 【ベース】画面全体を「完全に真っ黒」に塗りつぶす（これでプレイエリアなどは黒確定）
+    // 1️⃣ 画面全体を「完全に真っ黒」に塗りつぶす
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const isImgReady = currentBgImage && currentBgImage.complete && currentBgImage.naturalWidth !== 0;
 
-    // 2️⃣ 【ブロックエリアのみ】壊されたブロックの隙間から、リサイズされた画像を表示する
+    // 2️⃣ 【ブロックエリアのみ】壊されたブロックの隙間から、16:9に綺麗に収まった画像を表示する
     if (isImgReady) {
         for (let c = 0; c < BRICK_COLS; c++) {
             for (let r = 0; r < BRICK_ROWS; r++) {
                 let b = bricks[c][r];
                 
                 if (b.status === 0) {
-                    // ❗ここが今回の核心ロジック！
-                    // ブロックが壊された場所だけ、ピンポイントに切り抜いて「ブロックエリアぴったりに縮小された画像」を描画します。
                     ctx.save();
                     ctx.beginPath();
                     ctx.rect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
                     ctx.clip();
                     
-                    // 画像の描画先を、画面全体ではなく「ブロックの並びのエリア内（360x110）」にぴったり合わせます！
+                    // 16:9 の比率にリサイズされた画像が、ブロックエリアの枠にピッタリ重なるように描画
                     ctx.drawImage(
                         currentBgImage, 
                         BRICK_OFFSET_LEFT, 
@@ -224,13 +223,13 @@ function draw() {
         }
     }
 
-    // 3️⃣ 【手前】まだ残っているブロックを重ねて描く
-    const colors = ["#ff5e57", "#ffdd59", "#0be881", "#4bcffa", "#ef5777"];
+    // 3️⃣ 【手前】まだ残っているブロックを重ねて描く（9行用にカラフルなグラデーション）
+    const colors = ["#ff5e57", "#ff3f34", "#ffdd59", "#ffa801", "#0be881", "#05c46b", "#4bcffa", "#34e7e4", "#ef5777"];
     for (let c = 0; c < BRICK_COLS; c++) {
         for (let r = 0; r < BRICK_ROWS; r++) {
             let b = bricks[c][r];
             if (b.status === 1) {
-                ctx.fillStyle = colors[r];
+                ctx.fillStyle = colors[r % colors.length];
                 ctx.fillRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
             }
         }
