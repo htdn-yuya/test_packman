@@ -92,9 +92,6 @@ const BRICK_OFFSET_TOP = 40;
 const TOTAL_BRICK_WIDTH = BRICK_WIDTH * BRICK_COLS;
 const BRICK_OFFSET_LEFT = (canvas.width - TOTAL_BRICK_WIDTH) / 2;
 
-// 🧱 ブロックエリア全体の高さを計算
-const BRICK_AREA_HEIGHT = BRICK_HEIGHT * BRICK_ROWS;
-
 function initGame() {
     score = 0;
     gameOver = false;
@@ -174,7 +171,7 @@ function update() {
                 countActiveBricks++;
                 if (ball.x > b.x && ball.x < b.x + BRICK_WIDTH && ball.y > b.y && ball.y < b.y + BRICK_HEIGHT) {
                     ball.dy = -ball.dy;
-                    b.status = 0;
+                    b.status = 0; // ブロック消滅
                     score += 10;
                     scoreEl.innerText = "SCORE: " + score;
                 }
@@ -193,7 +190,7 @@ function draw() {
     // 画面全体を一度クリア
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1️⃣ 【一番奥】画面全体に背景画像を描画（画像がなければ黒背景）
+    // 1️⃣ 【一番奥】画面全体に背景画像を描画（なければ真っ黒）
     if (currentBgImage && currentBgImage.complete && currentBgImage.naturalWidth !== 0) {
         ctx.drawImage(currentBgImage, 0, 0, canvas.width, canvas.height);
     } else {
@@ -201,24 +198,26 @@ function draw() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // 2️⃣ 【ここが重要！】ブロックエリアの背景を「黒い四角（座布団）」で一旦塗りつぶす
-    // これにより、ブロックがまだ壊されていないエリアの後ろの画像がシャットアウトされます！
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(BRICK_OFFSET_LEFT, BRICK_OFFSET_TOP, TOTAL_BRICK_WIDTH, BRICK_AREA_HEIGHT);
-
-    // 3️⃣ 【手前】まだ残っているブロックを重ねて描く
+    // 2️⃣ 【手前】ブロックの描画処理
     const colors = ["#ff5e57", "#ffdd59", "#0be881", "#4bcffa", "#ef5777"];
     for (let c = 0; c < BRICK_COLS; c++) {
         for (let r = 0; r < BRICK_ROWS; r++) {
             let b = bricks[c][r];
             if (b.status === 1) {
+                // ❗ここが超重要変更！
+                // まだ壊されていないブロックの位置だけ、まず「黒い四角」を描いて奥の画像を完全に隠します！
+                ctx.fillStyle = "#000000";
+                ctx.fillRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
+
+                // その黒い土台の上に、カラフルなブロックを重ねて描きます
                 ctx.fillStyle = colors[r];
                 ctx.fillRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
             }
+            // ※ status === 0（壊されたブロック）の場所は何も描画されないので、一番奥の画像が露出します！
         }
     }
 
-    // 4️⃣ パドルとボールを描く
+    // 3️⃣ パドルとボールを描く
     ctx.fillStyle = "#ffdd59";
     ctx.fillRect(paddle.x, canvas.height - 25, paddle.width, paddle.height);
 
@@ -227,7 +226,7 @@ function draw() {
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // 5️⃣ 文字の表示
+    // 4️⃣ 文字の表示
     if (gameOver) {
         ctx.fillStyle = "#ff5e57";
         ctx.font = "bold 35px Arial";
