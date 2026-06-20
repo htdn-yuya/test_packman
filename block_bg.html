@@ -65,17 +65,17 @@ const scoreEl = document.getElementById("score");
 const restartBtn = document.getElementById("restart-btn");
 
 // ==========================================
-// 🖼️ 【ここに好きな画像のURLを好きなだけ入れる！】
+// 🖼️ 【画像URLリスト】
 // ==========================================
 const bgImages = [
-    "https://liginc.co.jp/wp-content/uploads/1954/12/gorilla-610457.jpg", // ランダムな写真1
-    "https://www.aloalo.co.jp/nakazawa/2018/0725c.jpg", // ランダムな写真2
-    "bg1.jpg", // ランダムな写真3
-    "bg2.jpg"  // ランダムな写真4
-    // 自分で用意したイラストのURL（ネット上のURL）に書き換えてもOKです！
+    "https://liginc.co.jp/wp-content/uploads/1954/12/gorilla-610457.jpg",
+    "https://www.aloalo.co.jp/nakazawa/2018/0725c.jpg",
+    "bg1.jpg",
+    "bg2.jpg"
 ];
 
 let currentBgImage = new Image(); // 現在の背景画像を保持するオブジェクト
+let gameIntervalId = null;        // 二重起動防止用のループ管理ID
 
 // ゲームの変数
 let score, gameOver, gameClear;
@@ -89,6 +89,9 @@ const BRICK_PADDING = 7;
 const BRICK_OFFSET_TOP = 40;
 const BRICK_OFFSET_LEFT = 18;
 
+// 🧱 ブロックエリアの最下部を計算（画像を表示し始める高さの境界線）
+const BRICK_AREA_BOTTOM = BRICK_OFFSET_TOP + (BRICK_HEIGHT + BRICK_PADDING) * BRICK_ROWS;
+
 function initGame() {
     score = 0;
     gameOver = false;
@@ -96,8 +99,14 @@ function initGame() {
     scoreEl.innerText = "SCORE: " + score;
     restartBtn.style.display = "none";
 
-    // 🎨 【追加】リスタート時に画像リストからランダムに1枚選ぶ
+    // 起動時のバグ（多重ループ）を防ぐため、古いループをクリア
+    if (gameIntervalId) {
+        cancelAnimationFrame(gameIntervalId);
+    }
+
+    // リスタート時に画像リストからランダムに1枚選ぶ
     const randomIndex = Math.floor(Math.random() * bgImages.length);
+    currentBgImage = new Image();
     currentBgImage.src = bgImages[randomIndex];
 
     // ボールとパドルの初期化
@@ -113,6 +122,7 @@ function initGame() {
         }
     }
     
+    // 画像の通信状態に関わらず、ゲームを即座に開始！
     gameLoop();
 }
 
@@ -178,10 +188,21 @@ function draw() {
     // 画面全体を消去
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 🖼️ 【追加】背景画像を一番奥に描画する
-    // 画像の読み込みが完了している場合のみ描画
-    if (currentBgImage.complete) {
+    // 🖼️ 背景画像の描画（ブロックの下から画面最下部までをクリッピング）
+    if (currentBgImage && currentBgImage.complete && currentBgImage.naturalWidth !== 0) {
+        ctx.save(); // 現在のキャンバス状態を保存
+        ctx.beginPath();
+        // 切り抜く範囲を「ブロックエリアの下」に指定
+        ctx.rect(0, BRICK_AREA_BOTTOM, canvas.width, canvas.height - BRICK_AREA_BOTTOM);
+        ctx.clip(); // 上記の四角形で切り抜きを適用
+        
+        // 画像を描画（切り抜かれているのでブロックエリアにはみ出さない）
         ctx.drawImage(currentBgImage, 0, 0, canvas.width, canvas.height);
+        ctx.restore(); // キャンバス状態を元に戻す
+    } else {
+        // 画像が読み込まれていない間は黒背景
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
     // ブロックを描く（存在しているブロックだけを描画するので、消えた場所は背景が見える！）
@@ -227,7 +248,7 @@ function gameLoop() {
     update();
     draw();
     if (!gameOver && !gameClear) {
-        requestAnimationFrame(gameLoop);
+        gameIntervalId = requestAnimationFrame(gameLoop);
     }
 }
 
