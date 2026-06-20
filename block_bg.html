@@ -65,7 +65,7 @@ const scoreEl = document.getElementById("score");
 const restartBtn = document.getElementById("restart-btn");
 
 // ==========================================
-// 🖼️ 【画像URLリスト】実際のファイル名に修正しました！
+// 🖼️ 【画像URLリスト】
 // ==========================================
 const bgImages = [
     "https://liginc.co.jp/wp-content/uploads/1954/12/gorilla-610457.jpg",
@@ -91,6 +91,9 @@ const BRICK_OFFSET_TOP = 40;
 // 🧱 ブロック全体が画面の真ん中に来るように左の余白を自動計算
 const TOTAL_BRICK_WIDTH = BRICK_WIDTH * BRICK_COLS;
 const BRICK_OFFSET_LEFT = (canvas.width - TOTAL_BRICK_WIDTH) / 2;
+
+// 🧱 ブロックエリア全体の最下部のY座標を計算
+const BRICK_AREA_BOTTOM = BRICK_OFFSET_TOP + (BRICK_HEIGHT * BRICK_ROWS);
 
 function initGame() {
     score = 0;
@@ -187,30 +190,42 @@ function update() {
 
 // 描画処理
 function draw() {
-    // 画面全体を一度クリア
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 画面全体を黒でクリア
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 1️⃣ 【一番奥】画面全体に背景画像を描画（なければ真っ黒）
-    if (currentBgImage && currentBgImage.complete && currentBgImage.naturalWidth !== 0) {
+    const isImgReady = currentBgImage && currentBgImage.complete && currentBgImage.naturalWidth !== 0;
+
+    // 1️⃣ 【プレイエリア（下半分）】に画像を描画（ブロックエリアには絶対にはみ出させない）
+    if (isImgReady) {
+        ctx.save();
+        ctx.beginPath();
+        // 切り抜き範囲をブロックエリアより下全体に指定
+        ctx.rect(0, BRICK_AREA_BOTTOM, canvas.width, canvas.height - BRICK_AREA_BOTTOM);
+        ctx.clip();
         ctx.drawImage(currentBgImage, 0, 0, canvas.width, canvas.height);
-    } else {
-        ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
     }
 
-    // 2️⃣ 【手前】ブロックの描画処理
+    // 2️⃣ 【ブロックエリア】の描画処理
     const colors = ["#ff5e57", "#ffdd59", "#0be881", "#4bcffa", "#ef5777"];
     for (let c = 0; c < BRICK_COLS; c++) {
         for (let r = 0; r < BRICK_ROWS; r++) {
             let b = bricks[c][r];
+            
             if (b.status === 1) {
-                // まだ壊されていないブロックの位置だけ、まず「黒い四角」を描いて奥の画像を完全に隠します！
-                ctx.fillStyle = "#000000";
-                ctx.fillRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
-
-                // その黒い土台の上に、カラフルなブロックを重ねて描きます
+                // まだ残っているブロックは通常通りカラフルに描画（後ろはキャンバスの初期値の黒）
                 ctx.fillStyle = colors[r];
                 ctx.fillRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
+            } else if (b.status === 0 && isImgReady) {
+                // ❗ここが今回の最大の修正ポイント！
+                // ブロックが壊された（status === 0）場所「だけ」にピンポイントで画像を切り抜いて描画します。
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT); // このブロックのサイズだけ切り抜く
+                ctx.clip();
+                ctx.drawImage(currentBgImage, 0, 0, canvas.width, canvas.height); // 画像を重ねる
+                ctx.restore();
             }
         }
     }
