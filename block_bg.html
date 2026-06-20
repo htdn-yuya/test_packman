@@ -83,17 +83,14 @@ let ball, paddle, bricks;
 
 const BRICK_ROWS = 5;
 const BRICK_COLS = 6;
-const BRICK_WIDTH = 60;    // 隙間をなくした分、1つあたりの幅を少し広げて調整
-const BRICK_HEIGHT = 22;   // 高さを少しボリュームアップ
-const BRICK_PADDING = 0;   // ❗隙間を「0」に設定
+const BRICK_WIDTH = 60;    // 1つあたりの幅
+const BRICK_HEIGHT = 22;   // 1つあたりの高さ
+const BRICK_PADDING = 0;   // 隙間なし
 const BRICK_OFFSET_TOP = 40;
 
 // 🧱 ブロック全体が画面の真ん中に来るように左の余白を自動計算
 const TOTAL_BRICK_WIDTH = BRICK_WIDTH * BRICK_COLS;
 const BRICK_OFFSET_LEFT = (canvas.width - TOTAL_BRICK_WIDTH) / 2;
-
-// 🧱 ブロックエリアの最下部を計算（画像を表示し始める高さの境界線）
-const BRICK_AREA_BOTTOM = BRICK_OFFSET_TOP + (BRICK_HEIGHT * BRICK_ROWS);
 
 function initGame() {
     score = 0;
@@ -102,7 +99,7 @@ function initGame() {
     scoreEl.innerText = "SCORE: " + score;
     restartBtn.style.display = "none";
 
-    // 起動時のバグ（多重ループ）を防ぐため、古いループをクリア
+    // 古いループをクリア
     if (gameIntervalId) {
         cancelAnimationFrame(gameIntervalId);
     }
@@ -116,16 +113,18 @@ function initGame() {
     ball = { x: canvas.width / 2, y: canvas.height - 50, dx: 4, dy: -4, radius: 8 };
     paddle = { width: 90, height: 12, x: (canvas.width - 90) / 2 };
 
-    // ブロックの生成
+    // ブロックの初期位置と存在フラグを設定
     bricks = [];
     for (let c = 0; c < BRICK_COLS; c++) {
         bricks[c] = [];
         for (let r = 0; r < BRICK_ROWS; r++) {
-            bricks[c][r] = { x: 0, y: 0, status: 1 };
+            let brickX = (c * BRICK_WIDTH) + BRICK_OFFSET_LEFT;
+            let brickY = (r * BRICK_HEIGHT) + BRICK_OFFSET_TOP;
+            bricks[c][r] = { x: brickX, y: brickY, status: 1 };
         }
     }
     
-    // 画像の通信状態に関わらず、ゲームを即座に開始！
+    // 即座にゲームを開始
     gameLoop();
 }
 
@@ -172,7 +171,7 @@ function update() {
                 countActiveBricks++;
                 if (ball.x > b.x && ball.x < b.x + BRICK_WIDTH && ball.y > b.y && ball.y < b.y + BRICK_HEIGHT) {
                     ball.dy = -ball.dy;
-                    b.status = 0;
+                    b.status = 0; // ブロックが消える
                     score += 10;
                     scoreEl.innerText = "SCORE: " + score;
                 }
@@ -188,48 +187,39 @@ function update() {
 
 // 描画処理
 function draw() {
-    // 画面全体を消去
+    // 画面全体を一度クリア
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 🖼️ 背景画像の描画（ブロックの下から画面最下部までをクリッピング）
+    // 1️⃣ 【一番奥】画面全体に背景画像を描画（画像がなければ黒背景）
     if (currentBgImage && currentBgImage.complete && currentBgImage.naturalWidth !== 0) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, BRICK_AREA_BOTTOM, canvas.width, canvas.height - BRICK_AREA_BOTTOM);
-        ctx.clip();
         ctx.drawImage(currentBgImage, 0, 0, canvas.width, canvas.height);
-        ctx.restore();
     } else {
         ctx.fillStyle = "#000000";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // ブロックを描く（存在しているブロックだけを描画）
+    // 2️⃣ 【手前】まだ残っているブロックを「画像の上に重ねて」描く
     const colors = ["#ff5e57", "#ffdd59", "#0be881", "#4bcffa", "#ef5777"];
     for (let c = 0; c < BRICK_COLS; c++) {
         for (let r = 0; r < BRICK_ROWS; r++) {
-            if (bricks[c][r].status === 1) {
-                let brickX = (c * BRICK_WIDTH) + BRICK_OFFSET_LEFT;
-                let brickY = (r * BRICK_HEIGHT) + BRICK_OFFSET_TOP;
-                bricks[c][r].x = brickX;
-                bricks[c][r].y = brickY;
+            let b = bricks[c][r];
+            if (b.status === 1) {
                 ctx.fillStyle = colors[r];
-                ctx.fillRect(brickX, brickY, BRICK_WIDTH, BRICK_HEIGHT);
+                ctx.fillRect(b.x, b.y, BRICK_WIDTH, BRICK_HEIGHT);
             }
         }
     }
 
-    // パドルを描く
+    // 3️⃣ パドルとボールを描く
     ctx.fillStyle = "#ffdd59";
     ctx.fillRect(paddle.x, canvas.height - 25, paddle.width, paddle.height);
 
-    // ボールを描く
     ctx.fillStyle = "#fff";
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // ゲームオーバー・クリア文字
+    // 4️⃣ 文字の表示
     if (gameOver) {
         ctx.fillStyle = "#ff5e57";
         ctx.font = "bold 35px Arial";
