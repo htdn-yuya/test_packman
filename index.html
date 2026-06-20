@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スマホ対応パックマン</title>
+    <title>スマホ対応パックマン（リスタート機能付き）</title>
     <style>
-        /* スマホの画面にぴったり収めるためのデザイン */
         body {
             background-color: #000;
             color: #fff;
@@ -14,7 +13,6 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* 画面の連打でズームされるのを防ぐ */
             touch-action: manipulation; 
         }
         #score {
@@ -22,7 +20,6 @@
             font-weight: bold;
             margin: 10px 0 5px 0;
         }
-        /* ゲーム画面（キャンバス） */
         canvas {
             background-color: #000;
             display: block;
@@ -31,7 +28,27 @@
             max-height: 50vh;
             border: 2px solid blue;
         }
-        /* 【重要】スマホ用のコントローラー */
+        /* リスタートボタンのスタイル */
+        #restart-btn {
+            display: none; /* 通常時は隠しておく */
+            position: absolute;
+            top: 25vh;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ff0055;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 25px;
+            box-shadow: 0 4px 10px rgba(255, 0, 85, 0.5);
+            cursor: pointer;
+            z-index: 10;
+        }
+        #restart-btn:active {
+            background-color: #cc0044;
+        }
         .controller {
             display: grid;
             grid-template-columns: repeat(3, 70px);
@@ -55,7 +72,6 @@
         .btn:active {
             background-color: #666;
         }
-        /* 上下左右のボタン配置 */
         #btn-up { grid-column: 2; grid-row: 1; }
         #btn-left { grid-column: 1; grid-row: 2; }
         #btn-right { grid-column: 3; grid-row: 2; }
@@ -65,7 +81,10 @@
 <body>
 
     <div id="score">SCORE: 0</div>
-    <canvas id="gameCanvas" width="380" height="400"></canvas>
+    <div style="position: relative;">
+        <canvas id="gameCanvas" width="380" height="400"></canvas>
+        <button id="restart-btn">RESTART</button>
+    </div>
 
     <div class="controller">
         <div class="btn" id="btn-up">▲</div>
@@ -78,9 +97,10 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const scoreEl = document.getElementById("score");
+const restartBtn = document.getElementById("restart-btn");
 
-// 迷路のデザイン（元のPythonコードと完全一致）
-const maze = [
+// 元の迷路データをリセット用に保存しておくためのテンプレート
+const mazeTemplate = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
     [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
     [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
@@ -103,22 +123,42 @@ const maze = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
 
+let maze = [];
 const TILE_SIZE = 20;
 let score = 0;
 let gameOver = false;
 let gameClear = false;
-
-// プレイヤー設定
 let player = { x: 9, y: 16, dir: "stop" };
-// ゴースト設定
 let ghost = { x: 9, y: 10, dir: "up" };
-
-// エサの総数をカウント
 let totalDots = 0;
-for(let r=0; r<maze.length; r++) {
-    for(let c=0; c<maze[r].length; c++) {
-        if(maze[r][c] === 2) totalDots++;
+
+// 【追加】ゲームの状態を最初期化する関数
+function initGame() {
+    // 迷路データをコピーして復活させる
+    maze = mazeTemplate.map(row => [...row]);
+    
+    // 変数のリセット
+    score = 0;
+    gameOver = false;
+    gameClear = false;
+    totalDots = 0;
+    
+    player = { x: 9, y: 16, dir: "stop" };
+    ghost = { x: 9, y: 10, dir: "up" };
+    
+    // エサの数を再カウント
+    for(let r=0; r<maze.length; r++) {
+        for(let c=0; c<maze[r].length; c++) {
+            if(maze[r][c] === 2) totalDots++;
+        }
     }
+    
+    scoreEl.innerText = "SCORE: 0";
+    restartBtn.style.display = "none"; // ボタンを隠す
+    
+    // ゲームループを再始動
+    draw();
+    gameLoop();
 }
 
 function canMove(gx, gy) {
@@ -128,11 +168,9 @@ function canMove(gx, gy) {
     return false;
 }
 
-// 描画処理
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 迷路とエサの描画
     for(let r=0; r<maze.length; r++) {
         for(let c=0; c<maze[r].length; c++) {
             if(maze[r][c] === 1) {
@@ -147,37 +185,35 @@ function draw() {
         }
     }
 
-    // パックマン（プレイヤー）
     ctx.fillStyle = "yellow";
     ctx.beginPath();
     ctx.arc(player.x * TILE_SIZE + TILE_SIZE/2, player.y * TILE_SIZE + TILE_SIZE/2, 8, 0, Math.PI*2);
     ctx.fill();
 
-    // ゴースト
     ctx.fillStyle = "red";
     ctx.beginPath();
     ctx.arc(ghost.x * TILE_SIZE + TILE_SIZE/2, ghost.y * TILE_SIZE + TILE_SIZE/2, 8, 0, Math.PI*2);
     ctx.fill();
 
-    // 終了メッセージ
+    // 【変更】終了時にリスタートボタンを表示する
     if(gameOver) {
         ctx.fillStyle = "red";
         ctx.font = "bold 28px Arial";
         ctx.textAlign = "center";
         ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
+        restartBtn.style.display = "block"; // ボタンを表示！
     } else if(gameClear) {
         ctx.fillStyle = "green";
         ctx.font = "bold 28px Arial";
         ctx.textAlign = "center";
         ctx.fillText("GAME CLEAR!", canvas.width/2, canvas.height/2);
+        restartBtn.style.display = "block"; // ボタンを表示！
     }
 }
 
-// ゲームのメインループ（150ミリ秒ごと）
 function gameLoop() {
     if (gameOver || gameClear) return;
 
-    // --- プレイヤー移動 ---
     let npx = player.x;
     let npy = player.y;
     if(player.dir === "up") npy--;
@@ -190,7 +226,6 @@ function gameLoop() {
         player.y = npy;
     }
 
-    // --- エサを食べる ---
     if(maze[player.y][player.x] === 2) {
         maze[player.y][player.x] = 0;
         score += 10;
@@ -198,7 +233,6 @@ function gameLoop() {
         scoreEl.innerText = "SCORE: " + score;
     }
 
-    // --- ゴーストAI ---
     if(Math.random() < 0.3) {
         let pDirs = [];
         if(player.x > ghost.x && canMove(ghost.x + 1, ghost.y)) pDirs.push("right");
@@ -229,7 +263,7 @@ function gameLoop() {
             if(canMove(tx, ty)) vDirs.push(d);
         }
         if(vDirs.length > 0) {
-            ghost.dir = vDirs[Math.floor(Math.random() * vDirs.length)];
+            ghost.dir = vDirs[vDirs.length * Math.random() | 0];
         }
     }
 
@@ -238,7 +272,6 @@ function gameLoop() {
     else if(ghost.dir === "left") ghost.x--;
     else if(ghost.dir === "right") ghost.x++;
 
-    // --- 判定 ---
     if(player.x === ghost.x && player.y === ghost.y) {
         gameOver = true;
     }
@@ -250,7 +283,6 @@ function gameLoop() {
     setTimeout(gameLoop, 150);
 }
 
-// パソコン用のキーボード操作も残す
 window.addEventListener("keydown", e => {
     if(e.key === "ArrowUp") player.dir = "up";
     if(e.key === "ArrowDown") player.dir = "down";
@@ -258,21 +290,25 @@ window.addEventListener("keydown", e => {
     if(e.key === "ArrowRight") player.dir = "right";
 });
 
-// ★スマホ用のボタン操作イベント
 document.getElementById("btn-up").addEventListener("touchstart", () => player.dir = "up");
 document.getElementById("btn-down").addEventListener("touchstart", () => player.dir = "down");
 document.getElementById("btn-left").addEventListener("touchstart", () => player.dir = "left");
 document.getElementById("btn-right").addEventListener("touchstart", () => player.dir = "right");
 
-// パソコンのマウスクリックでもテストできるようにする
 document.getElementById("btn-up").addEventListener("mousedown", () => player.dir = "up");
 document.getElementById("btn-down").addEventListener("mousedown", () => player.dir = "down");
 document.getElementById("btn-left").addEventListener("mousedown", () => player.dir = "left");
 document.getElementById("btn-right").addEventListener("mousedown", () => player.dir = "right");
 
-// スタート
-draw();
-gameLoop();
+// 【追加】リスタートボタンが押された時のイベント（スマホ用・PC用両方）
+restartBtn.addEventListener("click", initGame);
+restartBtn.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    initGame();
+});
+
+// 初回スタート
+initGame();
 </script>
 </body>
 </html>
