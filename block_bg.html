@@ -83,14 +83,17 @@ let ball, paddle, bricks;
 
 const BRICK_ROWS = 5;
 const BRICK_COLS = 6;
-const BRICK_WIDTH = 55;
-const BRICK_HEIGHT = 20;
-const BRICK_PADDING = 7;
+const BRICK_WIDTH = 60;    // 隙間をなくした分、1つあたりの幅を少し広げて調整
+const BRICK_HEIGHT = 22;   // 高さを少しボリュームアップ
+const BRICK_PADDING = 0;   // ❗隙間を「0」に設定
 const BRICK_OFFSET_TOP = 40;
-const BRICK_OFFSET_LEFT = 18;
+
+// 🧱 ブロック全体が画面の真ん中に来るように左の余白を自動計算
+const TOTAL_BRICK_WIDTH = BRICK_WIDTH * BRICK_COLS;
+const BRICK_OFFSET_LEFT = (canvas.width - TOTAL_BRICK_WIDTH) / 2;
 
 // 🧱 ブロックエリアの最下部を計算（画像を表示し始める高さの境界線）
-const BRICK_AREA_BOTTOM = BRICK_OFFSET_TOP + (BRICK_HEIGHT + BRICK_PADDING) * BRICK_ROWS;
+const BRICK_AREA_BOTTOM = BRICK_OFFSET_TOP + (BRICK_HEIGHT * BRICK_ROWS);
 
 function initGame() {
     score = 0;
@@ -190,28 +193,24 @@ function draw() {
 
     // 🖼️ 背景画像の描画（ブロックの下から画面最下部までをクリッピング）
     if (currentBgImage && currentBgImage.complete && currentBgImage.naturalWidth !== 0) {
-        ctx.save(); // 現在のキャンバス状態を保存
+        ctx.save();
         ctx.beginPath();
-        // 切り抜く範囲を「ブロックエリアの下」に指定
         ctx.rect(0, BRICK_AREA_BOTTOM, canvas.width, canvas.height - BRICK_AREA_BOTTOM);
-        ctx.clip(); // 上記の四角形で切り抜きを適用
-        
-        // 画像を描画（切り抜かれているのでブロックエリアにはみ出さない）
+        ctx.clip();
         ctx.drawImage(currentBgImage, 0, 0, canvas.width, canvas.height);
-        ctx.restore(); // キャンバス状態を元に戻す
+        ctx.restore();
     } else {
-        // 画像が読み込まれていない間は黒背景
         ctx.fillStyle = "#000000";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // ブロックを描く（存在しているブロックだけを描画するので、消えた場所は背景が見える！）
+    // ブロックを描く（存在しているブロックだけを描画）
     const colors = ["#ff5e57", "#ffdd59", "#0be881", "#4bcffa", "#ef5777"];
     for (let c = 0; c < BRICK_COLS; c++) {
         for (let r = 0; r < BRICK_ROWS; r++) {
             if (bricks[c][r].status === 1) {
-                let brickX = (c * (BRICK_WIDTH + BRICK_PADDING)) + BRICK_OFFSET_LEFT;
-                let brickY = (r * (BRICK_HEIGHT + BRICK_PADDING)) + BRICK_OFFSET_TOP;
+                let brickX = (c * BRICK_WIDTH) + BRICK_OFFSET_LEFT;
+                let brickY = (r * BRICK_HEIGHT) + BRICK_OFFSET_TOP;
                 bricks[c][r].x = brickX;
                 bricks[c][r].y = brickY;
                 ctx.fillStyle = colors[r];
